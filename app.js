@@ -1,0 +1,3162 @@
+const APP_STORAGE_KEY = "lifeQueueDashboardStateV8";
+const APP_STORAGE_BACKUP_KEY = "lifeQueueDashboardStateBackupV1";
+const APP_HISTORY_ARCHIVE_KEY = "lifeQueueDashboardHistoryArchiveV1";
+const APP_PERSISTENT_DB_NAME = "lifeQueueDashboardVaultV1";
+const APP_PERSISTENT_DB_STORE = "kv";
+const APP_PERSISTENT_STATE_KEY = "latestState";
+const APP_PERSISTENT_ARCHIVE_KEY = "historyArchive";
+const TRACKING_START_DATE = "2026-04-30";
+const HISTORY_RECOVERY_VERSION = 1;
+const APP_HISTORY_RECOVERY_KEY = "lifeQueueDashboardRecoveredHistoryV1";
+
+const DEFAULT_STATE = {
+  activeDate: "",
+  selectedQueue: "physical",
+  progressRange: "daily",
+  playerName: "Abdullahi",
+  queueReadyText: "READY",
+  settings: {
+    fajrTime: "05:20",
+    dhuhrTime: "13:15",
+    asrTime: "17:05",
+    maghribTime: "19:42",
+    ishaTime: "21:20",
+    height: `5'8"`,
+    weight: 240,
+    sleepGoal: 8
+  },
+  queueForms: {
+    physical: {
+      weightLogged: "",
+      gymWent: "no",
+      workoutType: "",
+      calories: "",
+      protein: "",
+      carbs: "",
+      fat: "",
+      sleptAt: "23:30",
+      wokeAt: "07:30",
+      ateAfterMaghrib: "no",
+      waterOz: "",
+      steps: ""
+    },
+    deen: {
+      fajr: "no",
+      fajrSunnah: "no",
+      dhuhr: "no",
+      dhuhrSunnah: "no",
+      asr: "no",
+      maghrib: "no",
+      maghribSunnah: "no",
+      isha: "no",
+      ishaSunnah: "no",
+      tahajjud: "no",
+      quranPages: ""
+    },
+    routines: {
+      morningAcne: "no",
+      nightAcne: "no",
+      screenHours: ""
+    },
+    supplements: {
+      iron: "no",
+      zinc: "no",
+      magnesium: "no",
+      creatine: "no"
+    }
+  },
+  completedSections: {
+    physical: {
+      weight: false,
+      workout: false,
+      nutrition: false,
+      sleep: false,
+      hydration: false
+    },
+    deen: {
+      fajr: false,
+      dhuhr: false,
+      asr: false,
+      maghrib: false,
+      isha: false,
+      quran: false,
+      tahajjud: false
+    },
+    routines: {
+      morningAcne: false,
+      nightAcne: false,
+      screenHours: false
+    },
+    supplements: {
+      iron: false,
+      zinc: false,
+      magnesium: false,
+      creatine: false
+    }
+  },
+  history: []
+};
+
+const QUEUE_LABELS = {
+  physical: "Physical",
+  deen: "Deen",
+  routines: "Routines",
+  supplements: "Supplements",
+  queue: "Queue",
+  overview: "Career",
+  progress: "Progress"
+};
+
+let state = loadState();
+let pendingQueueChoice = state.selectedQueue;
+let persistentArchiveCache = [];
+
+const RECOVERED_HISTORY_FIXTURE_DATA = [
+  {
+    date: "2026-05-08",
+    id: "restored-2026-05-08",
+    result: "defeat",
+    rrDelta: -1,
+    kda: "11/19/6",
+    weight: 237.6,
+    calories: 2000,
+    steps: 3000,
+    screenHours: 5,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "237.6",
+        gymWent: "no",
+        workoutType: "carido",
+        calories: "2000",
+        sleptAt: "22:30",
+        wokeAt: "06:30",
+        ateAfterMaghrib: "yes",
+        waterOz: "30",
+        steps: "3000"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "yes",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "2"
+      },
+      routines: {
+        morningAcne: "no",
+        nightAcne: "no",
+        screenHours: "5"
+      },
+      supplements: {
+        iron: "no",
+        zinc: "no",
+        magnesium: "no",
+        creatine: "no"
+      }
+    }
+  },
+  {
+    date: "2026-05-07",
+    id: "restored-2026-05-07",
+    result: "defeat",
+    rrDelta: -3,
+    kda: "17/19/8",
+    weight: 238.4,
+    calories: 1500,
+    steps: 2529,
+    screenHours: 12,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "238.4",
+        gymWent: "yes",
+        workoutType: "Legs",
+        calories: "1500",
+        sleptAt: "23:30",
+        wokeAt: "06:00",
+        ateAfterMaghrib: "yes",
+        waterOz: "40",
+        steps: "2529"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "yes",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "8"
+      },
+      routines: {
+        morningAcne: "yes",
+        nightAcne: "no",
+        screenHours: "12"
+      },
+      supplements: {
+        iron: "yes",
+        zinc: "yes",
+        magnesium: "yes",
+        creatine: "yes"
+      }
+    }
+  },
+  {
+    date: "2026-05-06",
+    id: "restored-2026-05-06",
+    result: "victory",
+    rrDelta: 19,
+    kda: "15/19/6",
+    weight: 241.4,
+    calories: 1400,
+    steps: 10400,
+    screenHours: 10,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "241.4",
+        gymWent: "yes",
+        workoutType: "Pull",
+        calories: "1400",
+        sleptAt: "22:00",
+        wokeAt: "06:00",
+        ateAfterMaghrib: "yes",
+        waterOz: "50",
+        steps: "10400"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "yes",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "2"
+      },
+      routines: {
+        morningAcne: "no",
+        nightAcne: "no",
+        screenHours: "10"
+      },
+      supplements: {
+        iron: "yes",
+        zinc: "yes",
+        magnesium: "yes",
+        creatine: "yes"
+      }
+    }
+  },
+  {
+    date: "2026-05-05",
+    id: "restored-2026-05-05",
+    result: "victory",
+    rrDelta: 19,
+    kda: "15/19/7",
+    weight: 240,
+    calories: 1310,
+    steps: 10000,
+    screenHours: 15,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "240.0",
+        gymWent: "yes",
+        workoutType: "Push",
+        calories: "1310",
+        sleptAt: "23:00",
+        wokeAt: "04:00",
+        ateAfterMaghrib: "yes",
+        waterOz: "69",
+        steps: "10000"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "no",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "yes",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "yes",
+        quranPages: "2"
+      },
+      routines: {
+        morningAcne: "no",
+        nightAcne: "no",
+        screenHours: "15"
+      },
+      supplements: {
+        iron: "no",
+        zinc: "yes",
+        magnesium: "no",
+        creatine: "yes"
+      }
+    }
+  },
+  {
+    date: "2026-05-04",
+    id: "restored-2026-05-04",
+    result: "defeat",
+    rrDelta: -3,
+    kda: "15/19/6",
+    weight: 241,
+    calories: 2000,
+    steps: 3637,
+    screenHours: 12,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "241",
+        gymWent: "yes",
+        workoutType: "Legs",
+        calories: "2000",
+        sleptAt: "23:30",
+        wokeAt: "07:30",
+        ateAfterMaghrib: "yes",
+        waterOz: "60",
+        steps: "3637"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "no",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "2"
+      },
+      routines: {
+        morningAcne: "yes",
+        nightAcne: "no",
+        screenHours: "12"
+      },
+      supplements: {
+        iron: "no",
+        zinc: "no",
+        magnesium: "yes",
+        creatine: "yes"
+      }
+    }
+  },
+  {
+    date: "2026-05-03",
+    id: "restored-2026-05-03",
+    result: "victory",
+    rrDelta: 24,
+    kda: "16/19/7",
+    weight: 241,
+    calories: 2000,
+    steps: 5333,
+    screenHours: 14,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "241",
+        gymWent: "yes",
+        workoutType: "push",
+        calories: "2000",
+        sleptAt: "23:30",
+        wokeAt: "06:30",
+        ateAfterMaghrib: "yes",
+        waterOz: "40",
+        steps: "5333"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "yes",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "8"
+      },
+      routines: {
+        morningAcne: "yes",
+        nightAcne: "no",
+        screenHours: "14"
+      },
+      supplements: {
+        iron: "yes",
+        zinc: "no",
+        magnesium: "yes",
+        creatine: "no"
+      }
+    }
+  },
+  {
+    date: "2026-05-02",
+    id: "restored-2026-05-02",
+    result: "defeat",
+    rrDelta: -6,
+    kda: "14/19/6",
+    weight: 241.7,
+    calories: 1200,
+    steps: 2631,
+    screenHours: 17,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "241.7",
+        gymWent: "yes",
+        workoutType: "Push",
+        calories: "1200",
+        sleptAt: "23:30",
+        wokeAt: "07:30",
+        ateAfterMaghrib: "yes",
+        waterOz: "50",
+        steps: "2631"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "no",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "2"
+      },
+      routines: {
+        morningAcne: "yes",
+        nightAcne: "no",
+        screenHours: "17"
+      },
+      supplements: {
+        iron: "yes",
+        zinc: "no",
+        magnesium: "yes",
+        creatine: "yes"
+      }
+    }
+  },
+  {
+    date: "2026-05-01",
+    id: "restored-2026-05-01",
+    result: "defeat",
+    rrDelta: -3,
+    kda: "15/19/6",
+    weight: 242.5,
+    calories: 2000,
+    steps: 4011,
+    screenHours: 18,
+    formsSnapshot: {
+      physical: {
+        weightLogged: "242.5",
+        gymWent: "yes",
+        workoutType: "Cardio",
+        calories: "2000",
+        sleptAt: "23:30",
+        wokeAt: "07:30",
+        ateAfterMaghrib: "yes",
+        waterOz: "64",
+        steps: "4011"
+      },
+      deen: {
+        fajr: "yes",
+        fajrSunnah: "no",
+        dhuhr: "yes",
+        dhuhrSunnah: "no",
+        asr: "yes",
+        maghrib: "yes",
+        maghribSunnah: "no",
+        isha: "yes",
+        ishaSunnah: "no",
+        tahajjud: "no",
+        quranPages: "6"
+      },
+      routines: {
+        morningAcne: "yes",
+        nightAcne: "no",
+        screenHours: "18"
+      },
+      supplements: {
+        iron: "yes",
+        zinc: "no",
+        magnesium: "no",
+        creatine: "no"
+      }
+    }
+  }
+];
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const hydrated = await hydratePersistentState();
+  const restoredRecoveredHistory = restoreRecoveredHistoricalEntries();
+  const migratedCarry = migrateCarriedDayIfNeeded();
+  const rolledDay = ensureActiveDayState();
+  requestPersistentStorage();
+  const filledHistoryGaps = ensureHistoryCoverage();
+  setupNavTabs();
+  setupQueuePicker();
+  setupQueueActions();
+  setupSettings();
+  setupStaticButtons();
+  setupProgressRangeButtons();
+  renderAll();
+
+  if (hydrated || restoredRecoveredHistory || migratedCarry || rolledDay || filledHistoryGaps) {
+    saveState();
+  }
+
+  const persistBeforeHide = () => {
+    syncLiveHistoryFromForms();
+    recomputeCareerRR();
+    saveState();
+  };
+
+  window.addEventListener("pagehide", persistBeforeHide);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) persistBeforeHide();
+  });
+
+  setInterval(() => {
+    if (ensureActiveDayState()) {
+      renderAll();
+      saveState();
+      return;
+    }
+    renderQueueLabels();
+  }, 60000);
+
+  window.addEventListener("resize", () => {
+    if (document.getElementById("progress")?.classList.contains("active")) {
+      renderProgressCharts();
+    }
+  });
+});
+
+function structuredDefault() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+function requestPersistentStorage() {
+  try {
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+  } catch {}
+}
+
+function freshQueueForms() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE.queueForms));
+}
+
+function freshCompletedSections() {
+  return JSON.parse(JSON.stringify(DEFAULT_STATE.completedSections));
+}
+
+function buildRecoveredFormsSnapshot(partial = {}) {
+  const fresh = freshQueueForms();
+  return {
+    physical: { ...fresh.physical, ...(partial.physical || {}) },
+    deen: { ...fresh.deen, ...(partial.deen || {}) },
+    routines: { ...fresh.routines, ...(partial.routines || {}) },
+    supplements: { ...fresh.supplements, ...(partial.supplements || {}) }
+  };
+}
+
+function parseKdaParts(kda) {
+  const [requiredDone = 0, requiredTotal = 19, optionalDone = 0] = String(kda || "0/19/0")
+    .split("/")
+    .map((value) => Number(value) || 0);
+
+  return { requiredDone, requiredTotal, optionalDone };
+}
+
+function countYesValues(values = []) {
+  return values.filter((value) => value === "yes").length;
+}
+
+function createRecoveredHistoryEntry(data) {
+  const formsSnapshot = buildRecoveredFormsSnapshot(data.formsSnapshot);
+  const { requiredDone, requiredTotal, optionalDone } = parseKdaParts(data.kda);
+  const sunnahCount = countYesValues([
+    formsSnapshot.deen.fajrSunnah,
+    formsSnapshot.deen.dhuhrSunnah,
+    formsSnapshot.deen.maghribSunnah,
+    formsSnapshot.deen.ishaSunnah
+  ]);
+  const supplementsTaken = countYesValues(Object.values(formsSnapshot.supplements));
+
+  return {
+    id: data.id,
+    date: data.date,
+    updatedAt: new Date().toISOString(),
+    result: data.result,
+    rrDelta: data.rrDelta,
+    rrRunning: 0,
+    scoreline: `${data.weight} lb`,
+    kda: data.kda,
+    weight: data.weight,
+    calories: data.calories,
+    steps: data.steps,
+    screenHours: data.screenHours,
+    summary: {
+      requiredDone,
+      requiredTotal,
+      optionalDone,
+      result: data.result,
+      rrDelta: data.rrDelta,
+      weight: data.weight,
+      calories: data.calories,
+      steps: data.steps,
+      screenHours: data.screenHours,
+      gymWent: formsSnapshot.physical.gymWent === "yes",
+      allSalah: [
+        formsSnapshot.deen.fajr,
+        formsSnapshot.deen.dhuhr,
+        formsSnapshot.deen.asr,
+        formsSnapshot.deen.maghrib,
+        formsSnapshot.deen.isha
+      ].every((value) => value === "yes"),
+      sunnahCount,
+      tahajjud: formsSnapshot.deen.tahajjud === "yes",
+      quranPages: Number(formsSnapshot.deen.quranPages) || 0,
+      waterOz: Number(formsSnapshot.physical.waterOz) || 0,
+      sleptAt: formsSnapshot.physical.sleptAt || "",
+      wokeAt: formsSnapshot.physical.wokeAt || "",
+      ateAfterMaghrib: formsSnapshot.physical.ateAfterMaghrib === "yes",
+      morningAcne: formsSnapshot.routines.morningAcne === "yes",
+      nightAcne: formsSnapshot.routines.nightAcne === "yes",
+      supplementsTaken,
+      formsSnapshot
+    }
+  };
+}
+
+function hasRecoveryBeenApplied() {
+  try {
+    return Number(localStorage.getItem(APP_HISTORY_RECOVERY_KEY) || 0) >= HISTORY_RECOVERY_VERSION;
+  } catch {
+    return false;
+  }
+}
+
+function markRecoveryApplied() {
+  try {
+    localStorage.setItem(APP_HISTORY_RECOVERY_KEY, String(HISTORY_RECOVERY_VERSION));
+  } catch {}
+}
+
+function shouldRestoreRecoveredEntry(current, recovered) {
+  if (!current) return true;
+  if (isPlaceholderHistoryEntry(current)) return true;
+  if (String(current.kda || "") === "0/19/0") return true;
+  if ((Number(current.steps) || 0) === 0 && (Number(recovered.steps) || 0) > 0) return true;
+  if (!current.summary?.formsSnapshot) return true;
+  return getHistoryEntryScore(recovered) > getHistoryEntryScore(current);
+}
+
+function restoreRecoveredHistoricalEntries() {
+  const recoveredEntries = RECOVERED_HISTORY_FIXTURE_DATA.map(createRecoveredHistoryEntry);
+  const knownByDate = new Map(getAllKnownHistory().map((entry) => [entry.date, entry]));
+  let changed = false;
+
+  recoveredEntries.forEach((recovered) => {
+    const current = knownByDate.get(recovered.date);
+    if (!hasRecoveryBeenApplied() && !shouldRestoreRecoveredEntry(current, recovered)) {
+      return;
+    }
+    if (shouldRestoreRecoveredEntry(current, recovered) || !current) {
+      state.history = (state.history || []).filter((entry) => entry.date !== recovered.date);
+      state.history.push(recovered);
+      persistentArchiveCache = (persistentArchiveCache || []).filter((entry) => entry.date !== recovered.date);
+      persistentArchiveCache.push(recovered);
+      knownByDate.set(recovered.date, recovered);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    state.history = mergeHistoryCollections(state.history || [], loadHistoryArchive(), persistentArchiveCache);
+    recomputeCareerRR();
+    markRecoveryApplied();
+  }
+
+  return changed;
+}
+
+function loadState() {
+  try {
+    const primary = readStoredJson(APP_STORAGE_KEY);
+    const backup = readStoredJson(APP_STORAGE_BACKUP_KEY);
+    const parsed = chooseBestStoredState(primary, backup);
+    if (!parsed) return structuredDefault();
+    return buildNormalizedState(parsed, loadHistoryArchive());
+  } catch {
+    return structuredDefault();
+  }
+}
+
+function saveState() {
+  state.history = mergeHistoryCollections(
+    state.history || [],
+    loadHistoryArchive(),
+    persistentArchiveCache
+  );
+
+  const snapshot = {
+    ...state,
+    lastSavedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(snapshot));
+  localStorage.setItem(APP_STORAGE_BACKUP_KEY, JSON.stringify(snapshot));
+  persistHistoryArchive(snapshot.history || []);
+  persistStateToIndexedDb(snapshot);
+}
+
+function buildNormalizedState(parsed, extraHistory = []) {
+  const base = structuredDefault();
+  const mergedHistory = mergeHistoryCollections(
+    Array.isArray(parsed?.history) ? parsed.history : [],
+    extraHistory
+  );
+
+  return {
+    ...base,
+    ...(parsed || {}),
+    settings: { ...base.settings, ...((parsed || {}).settings || {}) },
+    queueForms: {
+      ...base.queueForms,
+      ...((parsed || {}).queueForms || {}),
+      physical: { ...base.queueForms.physical, ...(((parsed || {}).queueForms || {}).physical || {}) },
+      deen: { ...base.queueForms.deen, ...(((parsed || {}).queueForms || {}).deen || {}) },
+      routines: { ...base.queueForms.routines, ...(((parsed || {}).queueForms || {}).routines || {}) },
+      supplements: { ...base.queueForms.supplements, ...(((parsed || {}).queueForms || {}).supplements || {}) }
+    },
+    completedSections: {
+      ...base.completedSections,
+      ...((parsed || {}).completedSections || {}),
+      physical: { ...base.completedSections.physical, ...(((parsed || {}).completedSections || {}).physical || {}) },
+      deen: { ...base.completedSections.deen, ...(((parsed || {}).completedSections || {}).deen || {}) },
+      routines: { ...base.completedSections.routines, ...(((parsed || {}).completedSections || {}).routines || {}) },
+      supplements: { ...base.completedSections.supplements, ...(((parsed || {}).completedSections || {}).supplements || {}) }
+    },
+    history: mergedHistory
+  };
+}
+
+function readStoredJson(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function chooseBestStoredState(primary, backup) {
+  if (!primary && !backup) return null;
+  if (!primary) return backup;
+  if (!backup) return primary;
+
+  const primaryScore = getStoredStateScore(primary);
+  const backupScore = getStoredStateScore(backup);
+  return primaryScore >= backupScore ? primary : backup;
+}
+
+function getStoredStateScore(snapshot) {
+  const historyLength = Array.isArray(snapshot?.history) ? snapshot.history.length : 0;
+  const savedAt = Date.parse(snapshot?.lastSavedAt || "") || 0;
+  return historyLength * 10000000000000 + savedAt;
+}
+
+function loadHistoryArchive() {
+  const archive = readStoredJson(APP_HISTORY_ARCHIVE_KEY);
+  if (!archive || typeof archive !== "object") return [];
+  return Object.values(archive).filter(Boolean);
+}
+
+function persistHistoryArchive(history) {
+  const existing = readStoredJson(APP_HISTORY_ARCHIVE_KEY);
+  const archive = existing && typeof existing === "object" ? existing : {};
+
+  history
+    .filter((entry) => entry && entry.id !== "live-today")
+    .forEach((entry) => {
+      const key = entry.date || entry.id;
+      const current = archive[key];
+      archive[key] = chooseBetterHistoryEntry(current, entry);
+    });
+
+  localStorage.setItem(APP_HISTORY_ARCHIVE_KEY, JSON.stringify(archive));
+  persistentArchiveCache = Object.values(archive).filter(Boolean);
+}
+
+function mergeHistoryCollections(...collections) {
+  const merged = new Map();
+
+  collections.flat().forEach((entry) => {
+    if (!entry) return;
+    const key = entry.id === "live-today" ? `live:${entry.date}` : `day:${entry.date || entry.id}`;
+    const current = merged.get(key);
+    merged.set(key, chooseBetterHistoryEntry(current, entry));
+  });
+
+  return [...merged.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function chooseBetterHistoryEntry(current, candidate) {
+  if (!current) return candidate;
+  const currentPlaceholder = isPlaceholderHistoryEntry(current);
+  const candidatePlaceholder = isPlaceholderHistoryEntry(candidate);
+
+  if (currentPlaceholder !== candidatePlaceholder) {
+    return currentPlaceholder ? candidate : current;
+  }
+
+  const currentUpdated = Date.parse(current.updatedAt || current.summary?.updatedAt || "") || 0;
+  const candidateUpdated = Date.parse(candidate.updatedAt || candidate.summary?.updatedAt || "") || 0;
+
+  if (candidateUpdated !== currentUpdated) {
+    return candidateUpdated > currentUpdated ? candidate : current;
+  }
+
+  return getHistoryEntryScore(candidate) >= getHistoryEntryScore(current) ? candidate : current;
+}
+
+function isPlaceholderHistoryEntry(entry) {
+  return Boolean(
+    entry?.summary?.isPlaceholder ||
+    String(entry?.id || "").startsWith("gap-") ||
+    entry?.id === "seed-yesterday"
+  );
+}
+
+function getHistoryEntryScore(entry) {
+  if (!entry) return -1;
+
+  let score = 0;
+  if (entry.id !== "seed-yesterday") score += 10;
+  if (entry.summary?.formsSnapshot) score += 8;
+  if (Number(entry.weight) > 0) score += 3;
+  if (Number(entry.calories) > 0) score += 2;
+  if (Number(entry.steps) > 0) score += 3;
+  if (Number(entry.screenHours) > 0) score += 1;
+  if (entry.kda) score += 2;
+  if (typeof entry.rrDelta === "number" && entry.rrDelta !== 0) score += 1;
+  if (entry.result === "victory") score += 1;
+
+  return score;
+}
+
+function openPersistentDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      resolve(null);
+      return;
+    }
+
+    const request = window.indexedDB.open(APP_PERSISTENT_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(APP_PERSISTENT_DB_STORE)) {
+        db.createObjectStore(APP_PERSISTENT_DB_STORE);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function readIndexedDbValue(key) {
+  return openPersistentDb()
+    .then((db) => {
+      if (!db) return null;
+
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_PERSISTENT_DB_STORE, "readonly");
+        const store = tx.objectStore(APP_PERSISTENT_DB_STORE);
+        const request = store.get(key);
+
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => db.close();
+      });
+    })
+    .catch(() => null);
+}
+
+function writeIndexedDbValue(key, value) {
+  return openPersistentDb()
+    .then((db) => {
+      if (!db) return null;
+
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(APP_PERSISTENT_DB_STORE, "readwrite");
+        const store = tx.objectStore(APP_PERSISTENT_DB_STORE);
+        store.put(value, key);
+
+        tx.oncomplete = () => {
+          db.close();
+          resolve(true);
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    })
+    .catch(() => null);
+}
+
+function buildArchiveObject(history) {
+  const archive = {};
+
+  history
+    .filter((entry) => entry && entry.id !== "live-today")
+    .forEach((entry) => {
+      const key = entry.date || entry.id;
+      archive[key] = chooseBetterHistoryEntry(archive[key], entry);
+    });
+
+  return archive;
+}
+
+async function persistStateToIndexedDb(snapshot) {
+  try {
+    await writeIndexedDbValue(APP_PERSISTENT_STATE_KEY, snapshot);
+
+    const existingArchive = await readIndexedDbValue(APP_PERSISTENT_ARCHIVE_KEY);
+    const archive = existingArchive && typeof existingArchive === "object" ? existingArchive : {};
+    const nextArchive = {
+      ...archive,
+      ...buildArchiveObject(
+        mergeHistoryCollections(Object.values(archive), snapshot.history || [])
+      )
+    };
+
+    persistentArchiveCache = Object.values(nextArchive).filter(Boolean);
+    await writeIndexedDbValue(APP_PERSISTENT_ARCHIVE_KEY, nextArchive);
+  } catch {}
+}
+
+async function hydratePersistentState() {
+  try {
+    const [persistedSnapshot, persistedArchiveRaw] = await Promise.all([
+      readIndexedDbValue(APP_PERSISTENT_STATE_KEY),
+      readIndexedDbValue(APP_PERSISTENT_ARCHIVE_KEY)
+    ]);
+
+    const persistedArchive =
+      persistedArchiveRaw && typeof persistedArchiveRaw === "object"
+        ? Object.values(persistedArchiveRaw).filter(Boolean)
+        : [];
+
+    persistentArchiveCache = persistedArchive;
+
+    if (!persistedSnapshot && !persistedArchive.length) return false;
+
+    const preferred = chooseBestStoredState(state, persistedSnapshot);
+    const hydratedState = buildNormalizedState(preferred || state, [
+      loadHistoryArchive(),
+      persistedArchive
+    ].flat());
+
+    const currentScore = getStoredStateScore(state);
+    const hydratedScore = getStoredStateScore(hydratedState);
+    const currentHistoryLength = Array.isArray(state.history) ? state.history.length : 0;
+    const hydratedHistoryLength = Array.isArray(hydratedState.history) ? hydratedState.history.length : 0;
+
+    if (hydratedScore > currentScore || hydratedHistoryLength > currentHistoryLength) {
+      state = hydratedState;
+      pendingQueueChoice = state.selectedQueue;
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function getAllKnownHistory() {
+  return mergeHistoryCollections(state.history || [], loadHistoryArchive(), persistentArchiveCache);
+}
+
+function seedYesterdayIfNeeded() {
+  return ensureHistoryCoverage();
+}
+
+function parseDateKeyToLocalNoon(dateKey) {
+  const [year, month, day] = String(dateKey).split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0, 0);
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const next = parseDateKeyToLocalNoon(dateKey);
+  next.setDate(next.getDate() + days);
+  return formatLocalDateKey(next);
+}
+
+function getEarlierDateKey(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a <= b ? a : b;
+}
+
+function createPlaceholderHistoryEntry(date) {
+  return {
+    id: `gap-${date}`,
+    date,
+    updatedAt: new Date().toISOString(),
+    result: "defeat",
+    rrDelta: 0,
+    rrRunning: 0,
+    scoreline: "0 lb",
+    kda: "0/19/0",
+    weight: 0,
+    calories: 0,
+    steps: 0,
+    screenHours: 0,
+    summary: {
+      requiredDone: 0,
+      requiredTotal: 19,
+      optionalDone: 0,
+      result: "defeat",
+      rrDelta: 0,
+      isPlaceholder: true,
+      formsSnapshot: freshQueueForms()
+    }
+  };
+}
+
+function ensureHistoryCoverage() {
+  const finalizedHistory = getAllKnownHistory()
+    .filter((entry) => entry?.id !== "live-today" && entry?.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const earliestDate = finalizedHistory[0]?.date || "";
+  const yesterday = getYesterdayDateString();
+  const coverageStart = getEarlierDateKey(earliestDate, TRACKING_START_DATE);
+
+  if (!coverageStart || coverageStart > yesterday) return false;
+
+  const existingDates = new Set(finalizedHistory.map((entry) => entry.date));
+  let cursor = coverageStart;
+  let addedAny = false;
+
+  while (cursor <= yesterday) {
+    if (!existingDates.has(cursor)) {
+      state.history.unshift(createPlaceholderHistoryEntry(cursor));
+      existingDates.add(cursor);
+      addedAny = true;
+    }
+
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+
+  if (addedAny) {
+    recomputeCareerRR();
+  }
+
+  return addedAny;
+}
+
+function getYesterdayDateString() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return formatLocalDateKey(d);
+}
+
+function getTodayDateString() {
+  return formatLocalDateKey(new Date());
+}
+
+function formatLocalDateKey(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function hasMeaningfulDayState(queueForms = state.queueForms, completedSections = state.completedSections) {
+  return (
+    JSON.stringify(queueForms) !== JSON.stringify(DEFAULT_STATE.queueForms) ||
+    JSON.stringify(completedSections) !== JSON.stringify(DEFAULT_STATE.completedSections)
+  );
+}
+
+function buildHistoryEntry(date, summary, id = `day-${date}`) {
+  return {
+    id,
+    date,
+    updatedAt: new Date().toISOString(),
+    result: summary.result,
+    rrDelta: summary.rrDelta,
+    rrRunning: 0,
+    scoreline: `${summary.weight || 0} lb`,
+    kda: `${summary.requiredDone}/${summary.requiredTotal}/${summary.optionalDone}`,
+    weight: summary.weight,
+    calories: summary.calories,
+    steps: summary.steps,
+    screenHours: summary.screenHours,
+    summary
+  };
+}
+
+function migrateCarriedDayIfNeeded() {
+  const today = getTodayDateString();
+  const yesterday = getYesterdayDateString();
+
+  if (state.activeDate) return false;
+
+  const hasTodayEntry = state.history.some((x) => x.date === today);
+  const hasYesterdayEntry = state.history.some((x) => x.date === yesterday);
+  const hasCarryData = hasMeaningfulDayState();
+
+  if (hasTodayEntry && !hasYesterdayEntry && hasCarryData) {
+    const carriedSummary = summarizeCurrentDay();
+
+    state.history = state.history.filter(
+      (x) => x.id !== "live-today" && x.date !== today && x.date !== yesterday
+    );
+    state.history.unshift(buildHistoryEntry(yesterday, carriedSummary, `migrated-${yesterday}`));
+
+    state.queueForms = freshQueueForms();
+    state.completedSections = freshCompletedSections();
+    state.activeDate = today;
+    return true;
+  }
+
+  const hadWrongLiveEntry = state.history.some((x) => x.id === "live-today" && x.date !== today);
+  if (hadWrongLiveEntry) {
+    state.history = state.history.filter((x) => x.id !== "live-today");
+  }
+
+  state.activeDate = today;
+  return true;
+}
+
+function ensureActiveDayState() {
+  const today = getTodayDateString();
+
+  if (!state.activeDate) {
+    state.activeDate = today;
+    return true;
+  }
+
+  if (state.activeDate === today) {
+    return false;
+  }
+
+  const previousDate = state.activeDate;
+  const shouldArchivePreviousDay = hasMeaningfulDayState();
+
+  state.history = state.history.filter((x) => x.id !== "live-today");
+
+  if (shouldArchivePreviousDay) {
+    const previousSummary = summarizeCurrentDay();
+    state.history = state.history.filter((x) => x.date !== previousDate);
+    state.history.unshift(buildHistoryEntry(previousDate, previousSummary, `day-${previousDate}`));
+  }
+
+  state.queueForms = freshQueueForms();
+  state.completedSections = freshCompletedSections();
+  state.activeDate = today;
+  return true;
+}
+
+/* NAV */
+
+function setupNavTabs() {
+  document.querySelectorAll(".nav-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tab;
+      if (target) openTab(target);
+    });
+  });
+}
+
+function openTab(tabId) {
+  document.querySelectorAll(".tab-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.id === tabId);
+  });
+
+  document.querySelectorAll(".nav-tab").forEach((tab) => {
+    const active = tab.dataset.tab === tabId;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+  });
+
+  if (tabId === "progress") {
+    renderProgressCharts();
+  }
+}
+
+/* QUEUE PICKER */
+
+function setupQueuePicker() {
+  const overlay = document.getElementById("queuePickerOverlay");
+  const openButton = document.getElementById("openQueuePicker");
+  const closeButton = document.getElementById("closeQueuePicker");
+
+  if (!overlay) return;
+
+  const openPicker = () => {
+    pendingQueueChoice = state.selectedQueue;
+    syncQueuePickerSelection();
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+  };
+
+  const closePicker = () => {
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+  };
+
+  openButton?.addEventListener("click", openPicker);
+  closeButton?.addEventListener("click", closePicker);
+
+  document.querySelectorAll("[data-queue-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const selected = button.dataset.queueChoice;
+      state.selectedQueue = selected;
+      pendingQueueChoice = selected;
+      saveState();
+      renderQueueLabels();
+      closePicker();
+    });
+  });
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closePicker();
+  });
+}
+
+function syncQueuePickerSelection() {
+  document.querySelectorAll("[data-queue-choice]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.queueChoice === pendingQueueChoice);
+  });
+}
+
+/* QUEUE ACTIONS */
+
+function setupQueueActions() {
+  document.getElementById("queueNow")?.addEventListener("click", () => {
+    openTab(state.selectedQueue);
+  });
+
+  document.getElementById("queueToCareer")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    openTab("overview");
+  });
+
+  document.getElementById("queueModeButton")?.addEventListener("click", (event) => {
+    event.preventDefault();
+  });
+}
+
+/* SETTINGS */
+
+function setupSettings() {
+  const overlay = document.getElementById("settingsOverlay");
+  const openButton = document.getElementById("openSettings");
+  const closeButton = document.getElementById("closeSettings");
+  const saveButton = document.getElementById("saveSettings");
+
+  if (!overlay) return;
+
+  const openSettings = () => {
+    hydrateSettingsInputs();
+    overlay.classList.remove("hidden");
+  };
+
+  const closeSettings = () => {
+    overlay.classList.add("hidden");
+  };
+
+  openButton?.addEventListener("click", openSettings);
+  closeButton?.addEventListener("click", closeSettings);
+
+  saveButton?.addEventListener("click", () => {
+    pullSettingsInputs();
+    saveState();
+    renderAll();
+    closeSettings();
+  });
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeSettings();
+  });
+}
+
+function hydrateSettingsInputs() {
+  setInputValue("fajrTime", state.settings.fajrTime);
+  setInputValue("dhuhrTime", state.settings.dhuhrTime);
+  setInputValue("asrTime", state.settings.asrTime);
+  setInputValue("maghribTime", state.settings.maghribTime);
+  setInputValue("ishaTime", state.settings.ishaTime);
+  setInputValue("height", state.settings.height);
+  setInputValue("weight", state.settings.weight);
+  setInputValue("sleepGoal", state.settings.sleepGoal);
+}
+
+function pullSettingsInputs() {
+  state.settings.fajrTime = getInputValue("fajrTime");
+  state.settings.dhuhrTime = getInputValue("dhuhrTime");
+  state.settings.asrTime = getInputValue("asrTime");
+  state.settings.maghribTime = getInputValue("maghribTime");
+  state.settings.ishaTime = getInputValue("ishaTime");
+  state.settings.height = getInputValue("height");
+  state.settings.weight = Number(getInputValue("weight")) || 0;
+  state.settings.sleepGoal = Number(getInputValue("sleepGoal")) || 0;
+}
+
+function setupStaticButtons() {
+  document.querySelector(".back-link")?.addEventListener("click", () => openTab("queue"));
+}
+
+/* PROGRESS RANGE */
+
+function setupProgressRangeButtons() {
+  document.querySelectorAll(".progress-range-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.progressRange = button.dataset.range;
+      saveState();
+      syncProgressRangeUI();
+      renderProgressCharts();
+    });
+  });
+
+  syncProgressRangeUI();
+}
+
+function syncProgressRangeUI() {
+  document.querySelectorAll(".progress-range-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.range === state.progressRange);
+  });
+}
+
+/* RENDER ALL */
+
+function renderAll() {
+  ensureHistoryCoverage();
+  syncLiveHistoryFromForms();
+  recomputeCareerRR();
+  renderQueueLabels();
+  renderPhysicalTab();
+  renderDeenTab();
+  renderRoutinesTab();
+  renderSupplementsTab();
+  renderCareerTab();
+  syncProgressRangeUI();
+  renderProgressCharts();
+}
+
+/* QUEUE LABELS */
+
+function renderQueueLabels() {
+  const queueLabel = QUEUE_LABELS[state.selectedQueue] || "Physical";
+  const nextSalahText = getNextSalahText();
+
+  setText("currentQueueButtonLabel", queueLabel);
+  setText("bannerMessage", `Next salah: ${nextSalahText}`);
+  setText("nextSalah", nextSalahText);
+  setText("queueDayDoneInline", `${getDayCompletionPercent()}%`);
+  setText("queuePlayerName", state.playerName);
+  setText("queueCardReadyState", state.queueReadyText);
+}
+
+/* PHYSICAL */
+
+function renderPhysicalTab() {
+  const form = state.queueForms.physical;
+  const completed = state.completedSections.physical;
+  const left = [];
+  const right = [];
+
+  addSection(
+    completed.weight,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Weight</span><h3>Morning weight</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="physical" data-section="weight">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Weight logged</span>
+            <input id="physicalWeightLogged" type="number" step="0.1" value="${escapeHtml(form.weightLogged)}" />
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("physical", "weight", "Morning weight")
+  );
+
+  addSection(
+    completed.workout,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Gym</span><h3>Workout check</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="physical" data-section="workout">Done</button>
+        </div>
+        <div class="task-input-grid">
+          <label>
+            <span class="field-label">Did you go gym?</span>
+            <select id="physicalGymWent">
+              <option value="no" ${form.gymWent === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form.gymWent === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+          ${
+            form.gymWent === "yes"
+              ? `
+            <label>
+              <span class="field-label">What did you hit?</span>
+              <input id="physicalWorkoutType" type="text" value="${escapeHtml(form.workoutType)}" placeholder="Push, Pull, Legs..." />
+            </label>
+          `
+              : ""
+          }
+        </div>
+      </section>
+    `,
+    renderCompletedCard("physical", "workout", "Workout check")
+  );
+
+  addSection(
+    completed.nutrition,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Nutrition</span><h3>Calories</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="physical" data-section="nutrition">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Calories</span>
+            <input id="physicalCalories" type="number" value="${escapeHtml(form.calories)}" />
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("physical", "nutrition", "Calories")
+  );
+
+  addSection(
+    completed.sleep,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Sleep</span><h3>Sleep log</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="physical" data-section="sleep">Done</button>
+        </div>
+        <div class="task-input-grid">
+          <label>
+            <span class="field-label">Slept at</span>
+            <input id="physicalSleptAt" type="time" value="${escapeHtml(form.sleptAt)}" />
+          </label>
+          <label>
+            <span class="field-label">Woke up at</span>
+            <input id="physicalWokeAt" type="time" value="${escapeHtml(form.wokeAt)}" />
+          </label>
+          <div>
+            <span class="field-label">Hours slept</span>
+            <div class="auto-sleep-output"><strong>${calculateSleepHours(form.sleptAt, form.wokeAt)}</strong></div>
+          </div>
+          <label>
+            <span class="field-label">Ate after Maghrib?</span>
+            <select id="physicalAteAfterMaghrib">
+              <option value="no" ${form.ateAfterMaghrib === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form.ateAfterMaghrib === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("physical", "sleep", "Sleep log")
+  );
+
+  addSection(
+    completed.hydration,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Hydration</span><h3>Water and steps</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="physical" data-section="hydration">Done</button>
+        </div>
+        <div class="task-input-grid">
+          <label>
+            <span class="field-label">Water drank (oz)</span>
+            <input id="physicalWaterOz" type="number" value="${escapeHtml(form.waterOz)}" />
+          </label>
+          <label>
+            <span class="field-label">Steps</span>
+            <input id="physicalSteps" type="number" value="${escapeHtml(form.steps)}" />
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("physical", "hydration", "Water and steps")
+  );
+
+  setHtml("physicalTaskStack", left.length ? left.join("") : renderEmptyLeft("Physical"));
+  setHtml("physicalCompletedStack", right.length ? right.join("") : renderEmptyRight());
+
+  wirePhysicalInputs();
+  wireSectionButtons("physical");
+}
+
+/* DEEN */
+
+function renderDeenTab() {
+  const form = state.queueForms.deen;
+  const completed = state.completedSections.deen;
+  const left = [];
+  const right = [];
+
+  renderPrayerSection("fajr", "Fajr", "fajrSunnah", "Fajr Sunnah", left, right, form, completed);
+  renderPrayerSection("dhuhr", "Dhuhr", "dhuhrSunnah", "Dhuhr Sunnah", left, right, form, completed);
+  renderPrayerSection("asr", "Asr", null, null, left, right, form, completed);
+  renderPrayerSection("maghrib", "Maghrib", "maghribSunnah", "Maghrib Sunnah", left, right, form, completed);
+  renderPrayerSection("isha", "Isha", "ishaSunnah", "Isha Sunnah", left, right, form, completed);
+
+  addSection(
+    completed.quran,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Quran</span><h3>Quran progress</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="deen" data-section="quran">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Pages completed today</span>
+            <input id="deenQuranPages" type="number" value="${escapeHtml(form.quranPages)}" />
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("deen", "quran", "Quran progress")
+  );
+
+  addSection(
+    completed.tahajjud,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Night worship</span><h3>Tahajjud</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="deen" data-section="tahajjud">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Did you pray Tahajjud?</span>
+            <select id="deenTahajjud">
+              <option value="no" ${form.tahajjud === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form.tahajjud === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("deen", "tahajjud", "Tahajjud")
+  );
+
+  setHtml("deenTaskStack", left.length ? left.join("") : renderEmptyLeft("Deen"));
+  setHtml("deenCompletedStack", right.length ? right.join("") : renderEmptyRight());
+
+  wireDeenInputs();
+  wireSectionButtons("deen");
+}
+
+function renderPrayerSection(key, label, sunnahKey, sunnahLabel, left, right, form, completed) {
+  addSection(
+    completed[key],
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Salah</span><h3>${label}</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="deen" data-section="${key}">Done</button>
+        </div>
+        <div class="task-input-grid ${sunnahKey && form[key] === "yes" ? "" : "one-col"}">
+          <label>
+            <span class="field-label">Prayed ${label}?</span>
+            <select class="deen-salah-select" data-key="${key}">
+              <option value="no" ${form[key] === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form[key] === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+          ${
+            sunnahKey && form[key] === "yes"
+              ? `
+            <label>
+              <span class="field-label">Prayed ${sunnahLabel}?</span>
+              <select class="deen-sunnah-select" data-key="${sunnahKey}">
+                <option value="no" ${form[sunnahKey] === "no" ? "selected" : ""}>No</option>
+                <option value="yes" ${form[sunnahKey] === "yes" ? "selected" : ""}>Yes</option>
+              </select>
+            </label>
+          `
+              : ""
+          }
+        </div>
+      </section>
+    `,
+    renderCompletedCard("deen", key, label)
+  );
+}
+
+/* ROUTINES */
+
+function renderRoutinesTab() {
+  const form = state.queueForms.routines;
+  const completed = state.completedSections.routines;
+  const left = [];
+  const right = [];
+
+  addSection(
+    completed.morningAcne,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Routine</span><h3>Morning acne treatment</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="routines" data-section="morningAcne">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Did you do it?</span>
+            <select id="routinesMorningAcne">
+              <option value="no" ${form.morningAcne === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form.morningAcne === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("routines", "morningAcne", "Morning acne treatment")
+  );
+
+  addSection(
+    completed.nightAcne,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Routine</span><h3>Night acne treatment</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="routines" data-section="nightAcne">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Did you do it?</span>
+            <select id="routinesNightAcne">
+              <option value="no" ${form.nightAcne === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form.nightAcne === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("routines", "nightAcne", "Night acne treatment")
+  );
+
+  addSection(
+    completed.screenHours,
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Focus</span><h3>Screen time</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="routines" data-section="screenHours">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Hours on phone</span>
+            <input id="routinesScreenHours" type="number" step="0.1" value="${escapeHtml(form.screenHours)}" />
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("routines", "screenHours", "Screen time")
+  );
+
+  setHtml("routinesTaskStack", left.length ? left.join("") : renderEmptyLeft("Routines"));
+  setHtml("routinesCompletedStack", right.length ? right.join("") : renderEmptyRight());
+
+  bindSelect("routinesMorningAcne", state.queueForms.routines, "morningAcne");
+  bindSelect("routinesNightAcne", state.queueForms.routines, "nightAcne");
+  bindInput("routinesScreenHours", state.queueForms.routines, "screenHours", true);
+  wireSectionButtons("routines");
+}
+
+/* SUPPLEMENTS */
+
+function renderSupplementsTab() {
+  const form = state.queueForms.supplements;
+  const completed = state.completedSections.supplements;
+  const left = [];
+  const right = [];
+
+  renderSupplement("iron", "Iron", form, completed, left, right);
+  renderSupplement("zinc", "Zinc", form, completed, left, right);
+  renderSupplement("magnesium", "Magnesium", form, completed, left, right);
+  renderSupplement("creatine", "Creatine", form, completed, left, right);
+
+  setHtml("supplementsTaskStack", left.length ? left.join("") : renderEmptyLeft("Supplements"));
+  setHtml("supplementsCompletedStack", right.length ? right.join("") : renderEmptyRight());
+
+  bindSelect("supplementsIron", state.queueForms.supplements, "iron");
+  bindSelect("supplementsZinc", state.queueForms.supplements, "zinc");
+  bindSelect("supplementsMagnesium", state.queueForms.supplements, "magnesium");
+  bindSelect("supplementsCreatine", state.queueForms.supplements, "creatine");
+  wireSectionButtons("supplements");
+}
+
+function renderSupplement(key, label, form, completed, left, right) {
+  addSection(
+    completed[key],
+    left,
+    right,
+    `
+      <section class="task-block">
+        <div class="task-block-header">
+          <div><span class="eyebrow">Supplements</span><h3>${label}</h3></div>
+          <button class="small-action section-done-button" type="button" data-tab="supplements" data-section="${key}">Done</button>
+        </div>
+        <div class="task-input-grid one-col">
+          <label>
+            <span class="field-label">Did you take it?</span>
+            <select id="supplements${capitalize(key)}">
+              <option value="no" ${form[key] === "no" ? "selected" : ""}>No</option>
+              <option value="yes" ${form[key] === "yes" ? "selected" : ""}>Yes</option>
+            </select>
+          </label>
+        </div>
+      </section>
+    `,
+    renderCompletedCard("supplements", key, label)
+  );
+}
+
+/* SHARED HELPERS FOR TASKS */
+
+function addSection(isDone, left, right, leftHtml, rightHtml) {
+  if (isDone) right.push(rightHtml);
+  else left.push(leftHtml);
+}
+
+function renderCompletedCard(tab, section, label) {
+  return `
+    <div class="completed-item">
+      <div class="completed-copy">
+        <span class="completed-title">${label}</span>
+        <p>Marked complete for today.</p>
+      </div>
+      <button class="secondary-action section-undo-button" type="button" data-tab="${tab}" data-section="${section}">
+        Undo
+      </button>
+    </div>
+  `;
+}
+
+function renderEmptyLeft(label) {
+  return `
+    <div class="task-block">
+      <div class="task-block-header">
+        <div>
+          <span class="eyebrow">${label}</span>
+          <h3>Everything done</h3>
+        </div>
+      </div>
+      <p class="support-copy">You cleared everything in this tab for today.</p>
+    </div>
+  `;
+}
+
+function renderEmptyRight() {
+  return `
+    <div class="task-block">
+      <div class="task-block-header">
+        <div>
+          <span class="eyebrow">Completion</span>
+          <h3>Nothing completed yet</h3>
+        </div>
+      </div>
+      <p class="support-copy">Finished sections will move here. Undo sends them back left.</p>
+    </div>
+  `;
+}
+
+/* WIRES */
+
+function wirePhysicalInputs() {
+  const form = state.queueForms.physical;
+
+  document.getElementById("physicalGymWent")?.addEventListener("change", (e) => {
+    form.gymWent = e.target.value;
+    syncLiveHistoryFromForms();
+    saveState();
+    renderPhysicalTab();
+    renderCareerTab();
+    renderProgressCharts();
+    openTab("physical");
+  });
+
+  bindInput("physicalWeightLogged", form, "weightLogged", true);
+  bindInput("physicalWorkoutType", form, "workoutType");
+  bindInput("physicalCalories", form, "calories", true);
+  bindInput("physicalSleptAt", form, "sleptAt", true);
+  bindInput("physicalWokeAt", form, "wokeAt", true);
+  bindSelect("physicalAteAfterMaghrib", form, "ateAfterMaghrib");
+  bindInput("physicalWaterOz", form, "waterOz", true);
+  bindInput("physicalSteps", form, "steps", true);
+}
+
+function wireDeenInputs() {
+  const form = state.queueForms.deen;
+
+  document.querySelectorAll(".deen-salah-select").forEach((select) => {
+    select.addEventListener("change", (e) => {
+      const key = e.target.dataset.key;
+      form[key] = e.target.value;
+      syncLiveHistoryFromForms();
+      saveState();
+      renderDeenTab();
+      renderCareerTab();
+      openTab("deen");
+    });
+  });
+
+  document.querySelectorAll(".deen-sunnah-select").forEach((select) => {
+    select.addEventListener("change", (e) => {
+      const key = e.target.dataset.key;
+      form[key] = e.target.value;
+      syncLiveHistoryFromForms();
+      saveState();
+      renderCareerTab();
+    });
+  });
+
+  bindInput("deenQuranPages", form, "quranPages", true);
+  bindSelect("deenTahajjud", form, "tahajjud");
+}
+
+function bindInput(id, obj, key, refreshViews = false) {
+  const el = document.getElementById(id);
+  el?.addEventListener("input", (e) => {
+    obj[key] = e.target.value;
+    syncLiveHistoryFromForms();
+    saveState();
+
+    if (refreshViews) {
+      renderCareerTab();
+      renderProgressCharts();
+      if (id === "physicalSleptAt" || id === "physicalWokeAt") {
+        renderPhysicalTab();
+        openTab("physical");
+      }
+    }
+  });
+}
+
+function bindSelect(id, obj, key) {
+  const el = document.getElementById(id);
+  el?.addEventListener("change", (e) => {
+    obj[key] = e.target.value;
+    syncLiveHistoryFromForms();
+    saveState();
+    renderCareerTab();
+  });
+}
+
+function wireSectionButtons(tabId) {
+  document.querySelectorAll(`#${tabId} .section-done-button`).forEach((button) => {
+    button.addEventListener("click", () => {
+      const section = button.dataset.section;
+      state.completedSections[tabId][section] = true;
+      syncLiveHistoryFromForms();
+      saveState();
+      renderAll();
+      openTab(tabId);
+    });
+  });
+
+  document.querySelectorAll(`#${tabId} .section-undo-button`).forEach((button) => {
+    button.addEventListener("click", () => {
+      const section = button.dataset.section;
+      state.completedSections[tabId][section] = false;
+      syncLiveHistoryFromForms();
+      saveState();
+      renderAll();
+      openTab(tabId);
+    });
+  });
+}
+
+/* HISTORY */
+
+function syncLiveHistoryFromForms() {
+  ensureActiveDayState();
+
+  const today = state.activeDate || getTodayDateString();
+  state.history = state.history.filter((x) => x.id !== "live-today" && x.date !== today);
+
+  if (!hasMeaningfulDayState()) {
+    state.history.sort((a, b) => b.date.localeCompare(a.date));
+    return;
+  }
+
+  const summary = summarizeCurrentDay();
+  const previousRR = getFinalizedCareerRR();
+  const rrRunning = Math.max(0, previousRR + summary.rrDelta);
+
+  const liveEntry = {
+    id: "live-today",
+    date: today,
+    updatedAt: new Date().toISOString(),
+    result: summary.result,
+    rrDelta: summary.rrDelta,
+    rrRunning,
+    scoreline: `${summary.weight || 0} lb`,
+    kda: `${summary.requiredDone}/${summary.requiredTotal}/${summary.optionalDone}`,
+    weight: summary.weight,
+    calories: summary.calories,
+    steps: summary.steps,
+    screenHours: summary.screenHours,
+    summary
+  };
+
+  state.history.unshift(liveEntry);
+  state.history.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function summarizeCurrentDay() {
+  const p = state.queueForms.physical;
+  const d = state.queueForms.deen;
+  const r = state.queueForms.routines;
+  const s = state.queueForms.supplements;
+
+  const requiredChecks = [
+    Number(p.weightLogged) > 0,
+    p.gymWent === "yes",
+    Number(p.calories) > 0,
+    !!p.sleptAt && !!p.wokeAt,
+    Number(p.waterOz) > 0,
+    Number(p.steps) > 0,
+    d.fajr === "yes",
+    d.dhuhr === "yes",
+    d.asr === "yes",
+    d.maghrib === "yes",
+    d.isha === "yes",
+    Number(d.quranPages) > 0,
+    r.morningAcne === "yes",
+    r.nightAcne === "yes",
+    Number(r.screenHours) > 0,
+    s.iron === "yes",
+    s.zinc === "yes",
+    s.magnesium === "yes",
+    s.creatine === "yes"
+  ];
+
+  const optionalChecks = [
+    d.fajrSunnah === "yes",
+    d.dhuhrSunnah === "yes",
+    d.maghribSunnah === "yes",
+    d.ishaSunnah === "yes",
+    d.tahajjud === "yes"
+  ];
+
+  const requiredDone = requiredChecks.filter(Boolean).length;
+  const requiredTotal = requiredChecks.length;
+  const optionalDone = optionalChecks.filter(Boolean).length;
+  const missed = requiredTotal - requiredDone;
+
+  const result = missed === 0 ? "victory" : "defeat";
+  const rrDelta = missed === 0 ? 18 : -Math.min(18, Math.max(1, missed));
+
+  return {
+    requiredDone,
+    requiredTotal,
+    optionalDone,
+    result,
+    rrDelta,
+    weight: parseStoredMetric(p.weightLogged),
+    calories: parseStoredMetric(p.calories),
+    steps: parseStoredMetric(p.steps),
+    screenHours: parseStoredMetric(r.screenHours, { allowZero: true }),
+    gymWent: p.gymWent === "yes",
+    allSalah: d.fajr === "yes" && d.dhuhr === "yes" && d.asr === "yes" && d.maghrib === "yes" && d.isha === "yes",
+    sunnahCount: optionalChecks.slice(0, 4).filter(Boolean).length,
+    tahajjud: d.tahajjud === "yes",
+    quranPages: parseStoredMetric(d.quranPages, { allowZero: true }),
+    waterOz: parseStoredMetric(p.waterOz, { allowZero: true }),
+    sleptAt: p.sleptAt,
+    wokeAt: p.wokeAt,
+    ateAfterMaghrib: p.ateAfterMaghrib === "yes",
+    morningAcne: r.morningAcne === "yes",
+    nightAcne: r.nightAcne === "yes",
+    supplementsTaken: Object.values(s).filter((x) => x === "yes").length
+  };
+}
+
+function parseStoredMetric(value, options = {}) {
+  const n = Number(value);
+  if (Number.isFinite(n)) return n;
+  return options.allowZero ? 0 : 0;
+}
+
+
+
+/* PROGRESS - WEIGHT ONLY */
+
+function renderProgressCharts() {
+  const range = state.progressRange || "daily";
+  const weightSeries = buildSeriesFromHistory("weight", range).filter(item => item.value > 0);
+
+  renderWeightSummary(weightSeries);
+  drawWeightOnlyChart("weightChart", weightSeries);
+}
+
+function renderWeightSummary(series) {
+  const current = series.length ? series[series.length - 1].value : 0;
+  const start = series.length ? series[0].value : 0;
+  const goal = 220;
+  const totalChange = series.length ? current - start : 0;
+  const toGoal = current ? current - goal : 0;
+  const percent = start ? ((start - current) / start) * 100 : 0;
+
+  setText("weightCurrentBig", current ? current.toFixed(1) : "0.0");
+  setText("weightStartBig", start ? start.toFixed(1) : "0.0");
+  setText("weightGoalBig", goal.toFixed(1));
+  setText("weightLossBig", Math.abs(totalChange).toFixed(1));
+  setText("weightLossPercent", `${Math.abs(percent).toFixed(1)}%`);
+  setText("weightToGoal", Math.max(0, toGoal).toFixed(1));
+  setText("weightToGoalFooter", Math.max(0, toGoal).toFixed(1));
+
+  const streak = getWeightLoggingStreak();
+  setText("bestWeightStreak", String(streak));
+
+  const avgPerWeek = getAverageLossPerWeek(series);
+  setText("avgLossWeek", avgPerWeek.toFixed(2));
+
+  setText("goalDateEstimate", estimateGoalDate(current, goal, avgPerWeek));
+}
+
+function buildSeriesFromHistory(key, range) {
+  const sorted = [...state.history]
+    .filter(item => Number(item[key]) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (range === "daily") {
+    return sorted.slice(-90).map((item) => ({
+      label: shortDateLabel(item.date),
+      rawDate: item.date,
+      value: num(item[key])
+    }));
+  }
+
+  if (range === "weekly") {
+    const map = new Map();
+
+    sorted.forEach((item) => {
+      const weekKey = getWeekKey(item.date);
+      if (!map.has(weekKey)) map.set(weekKey, []);
+      map.get(weekKey).push(num(item[key]));
+    });
+
+    return Array.from(map.entries())
+      .slice(-24)
+      .map(([label, values]) => ({
+        label,
+        rawDate: label,
+        value: average(values)
+      }));
+  }
+
+  const monthMap = new Map();
+
+  sorted.forEach((item) => {
+    const monthKey = item.date.slice(0, 7);
+    if (!monthMap.has(monthKey)) monthMap.set(monthKey, []);
+    monthMap.get(monthKey).push(num(item[key]));
+  });
+
+  return Array.from(monthMap.entries())
+    .slice(-12)
+    .map(([monthKey, values]) => ({
+      label: monthShortLabel(monthKey),
+      rawDate: monthKey,
+      value: average(values)
+    }));
+}
+
+function drawWeightOnlyChart(id, series) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+
+  const tooltip = document.getElementById("weightChartTooltip");
+  const wrap = canvas.parentElement;
+  const rect = wrap.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  const width = Math.max(760, Math.floor(rect.width - 4));
+  const height = Math.min(420, Math.max(280, wrap.clientHeight || 420));
+
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const leftPad = 56;
+  const rightPad = 26;
+  const topPad = 32;
+  const bottomPad = 56;
+  const chartWidth = width - leftPad - rightPad;
+  const chartHeight = height - topPad - bottomPad;
+
+  if (!series.length) {
+    ctx.fillStyle = "rgba(236,248,252,0.7)";
+    ctx.font = "16px Inter";
+    ctx.fillText("No weight data yet", leftPad, 60);
+    return;
+  }
+
+  const values = series.map(p => p.value);
+  const movingAvgValues = series.map((_, i) => {
+    const start = Math.max(0, i - 6);
+    const slice = series.slice(start, i + 1).map(p => p.value);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
+
+  const allValues = [...values, ...movingAvgValues, 220];
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const pad = Math.max(1.2, (max - min) * 0.15);
+  const yMin = Math.max(0, min - pad);
+  const yMax = max + pad;
+  const yRange = Math.max(1, yMax - yMin);
+
+  const xStep = chartWidth / Math.max(1, series.length - 1);
+
+  const points = series.map((p, i) => ({
+    ...p,
+    x: leftPad + i * xStep,
+    y: topPad + (1 - (p.value - yMin) / yRange) * chartHeight
+  }));
+
+  const avgPoints = movingAvgValues.map((v, i) => ({
+    x: leftPad + i * xStep,
+    y: topPad + (1 - (v - yMin) / yRange) * chartHeight,
+    value: v
+  }));
+
+  const goal = 220;
+  const goalY = topPad + (1 - (goal - yMin) / yRange) * chartHeight;
+
+  function drawBase() {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < 7; i++) {
+      const y = topPad + i * (chartHeight / 6);
+      ctx.beginPath();
+      ctx.moveTo(leftPad, y);
+      ctx.lineTo(width - rightPad, y);
+      ctx.stroke();
+    }
+
+    const verticalCount = Math.min(series.length, 16);
+    for (let i = 0; i < verticalCount; i++) {
+      const x = leftPad + i * (chartWidth / Math.max(1, verticalCount - 1));
+      ctx.beginPath();
+      ctx.moveTo(x, topPad);
+      ctx.lineTo(x, height - bottomPad);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "rgba(233,240,245,0.82)";
+    ctx.font = "14px Inter";
+    for (let i = 0; i < 7; i++) {
+      const val = yMax - i * (yRange / 6);
+      const y = topPad + i * (chartHeight / 6);
+      ctx.fillText(val.toFixed(1), 8, y + 4);
+    }
+
+    ctx.textAlign = "center";
+    const labelStep = Math.ceil(series.length / 7);
+    series.forEach((p, i) => {
+      if (i % labelStep !== 0 && i !== series.length - 1) return;
+      ctx.fillStyle = "rgba(233,240,245,0.82)";
+      ctx.font = "14px Inter";
+      ctx.fillText(p.label, p.x, height - 18);
+    });
+    ctx.textAlign = "left";
+
+    ctx.setLineDash([10, 8]);
+    ctx.strokeStyle = "rgba(103,255,225,0.58)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(leftPad, goalY);
+    ctx.lineTo(width - rightPad, goalY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "rgba(103,255,225,0.9)";
+    ctx.font = "bold 14px Inter";
+    const goalText = `GOAL: ${goal.toFixed(1)} LB`;
+    const goalBoxW = ctx.measureText(goalText).width + 18;
+    ctx.strokeStyle = "rgba(103,255,225,0.45)";
+    ctx.strokeRect(width - goalBoxW - 6, goalY - 16, goalBoxW, 28);
+    ctx.fillText(goalText, width - goalBoxW + 4, goalY + 3);
+
+    ctx.strokeStyle = "rgba(230,236,242,0.54)";
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    avgPoints.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    ctx.strokeStyle = "#67ffe1";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    points.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    points.forEach((p) => {
+      ctx.fillStyle = "#67ffe1";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const last = points[points.length - 1];
+    if (last) {
+      ctx.strokeStyle = "#67ffe1";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(last.x + 18, last.y - 18);
+      ctx.stroke();
+
+      const valueText = `${last.value.toFixed(1)} LB`;
+      const dateText = last.label.toUpperCase();
+      const boxX = Math.min(width - 126, last.x + 18);
+      const boxY = Math.max(topPad + 6, last.y - 72);
+
+      ctx.fillStyle = "rgba(9,14,20,0.96)";
+      ctx.strokeStyle = "rgba(103,255,225,0.48)";
+      ctx.beginPath();
+      ctx.rect(boxX, boxY, 118, 62);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#67ffe1";
+      ctx.font = "bold 26px Rajdhani";
+      ctx.fillText(valueText, boxX + 10, boxY + 28);
+
+      ctx.fillStyle = "rgba(236,248,252,0.8)";
+      ctx.font = "14px Inter";
+      ctx.fillText(dateText, boxX + 10, boxY + 48);
+    }
+  }
+
+  drawBase();
+
+  canvas.onmousemove = (event) => {
+    const bounds = canvas.getBoundingClientRect();
+    const mx = event.clientX - bounds.left;
+    const my = event.clientY - bounds.top;
+
+    let hit = -1;
+    points.forEach((p, i) => {
+      const dx = mx - p.x;
+      const dy = my - p.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= 12) hit = i;
+    });
+
+    drawBase();
+
+    if (hit === -1) {
+      tooltip?.classList.add("hidden");
+      return;
+    }
+
+    const p = points[hit];
+
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x, topPad);
+    ctx.lineTo(p.x, height - bottomPad);
+    ctx.stroke();
+
+    ctx.fillStyle = "#041019";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#67ffe1";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (tooltip) {
+      tooltip.innerHTML = `
+        <strong>${p.value.toFixed(1)} LB</strong>
+        <span>${p.label}</span>
+      `;
+      tooltip.style.left = `${p.x}px`;
+      tooltip.style.top = `${p.y}px`;
+      tooltip.classList.remove("hidden");
+    }
+  };
+
+  canvas.onmouseleave = () => {
+    tooltip?.classList.add("hidden");
+    drawBase();
+  };
+}
+
+function getWeightLoggingStreak() {
+  const items = [...state.history]
+    .filter(item => Number(item.weight) > 0)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  let streak = 0;
+  let cursor = new Date();
+
+  for (const item of items) {
+    const expected = formatLocalDateKey(cursor);
+    if (item.date === expected) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else if (streak === 0) {
+      cursor.setDate(cursor.getDate() - 1);
+      if (item.date === formatLocalDateKey(cursor)) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+function getAverageLossPerWeek(series) {
+  if (series.length < 2) return 0;
+  const first = series[0].value;
+  const last = series[series.length - 1].value;
+  const change = first - last;
+  const weeks = Math.max(1, series.length / 7);
+  return change / weeks;
+}
+
+function estimateGoalDate(current, goal, avgPerWeek) {
+  if (!current || current <= goal) return "REACHED";
+  if (!avgPerWeek || avgPerWeek <= 0) return "--";
+
+  const poundsLeft = current - goal;
+  const weeksNeeded = poundsLeft / avgPerWeek;
+  const daysNeeded = Math.ceil(weeksNeeded * 7);
+
+  const d = new Date();
+  d.setDate(d.getDate() + daysNeeded);
+
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).toUpperCase();
+}
+
+/* HELPERS */
+
+function formatCareerDate(dateString) {
+  const d = new Date(`${dateString}T12:00:00`);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function average(values) {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+}
+
+function shortDateLabel(dateString) {
+  const d = new Date(`${dateString}T12:00:00`);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function monthShortLabel(monthKey) {
+  const [y, m] = monthKey.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(undefined, { month: "short" });
+}
+
+function getWeekKey(dateString) {
+  const start = startOfWeek(new Date(`${dateString}T12:00:00`));
+  return `${String(start.getMonth() + 1).padStart(2, "0")}/${String(start.getDate()).padStart(2, "0")}`;
+}
+
+function startOfWeek(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d;
+}
+
+function getRankName(rr) {
+  if (rr >= 700) return "Diamond 1";
+  if (rr >= 600) return "Platinum 1";
+  if (rr >= 500) return "Gold 1";
+  if (rr >= 400) return "Silver 1";
+  if (rr >= 300) return "Bronze 1";
+  return "Iron 1";
+}
+
+function getDayCompletionPercent() {
+  const total = getTotalSectionCount();
+  return total ? Math.round((getCompletedSectionCount() / total) * 100) : 0;
+}
+
+function getCompletedSectionCount() {
+  return Object.values(state.completedSections).reduce(
+    (sum, group) => sum + Object.values(group).filter(Boolean).length,
+    0
+  );
+}
+
+function getTotalSectionCount() {
+  return Object.values(state.completedSections).reduce(
+    (sum, group) => sum + Object.keys(group).length,
+    0
+  );
+}
+
+function getNextSalahText() {
+  const prayers = [
+    { key: "fajr", time: state.settings.fajrTime },
+    { key: "dhuhr", time: state.settings.dhuhrTime },
+    { key: "asr", time: state.settings.asrTime },
+    { key: "maghrib", time: state.settings.maghribTime },
+    { key: "isha", time: state.settings.ishaTime }
+  ];
+
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  for (const prayer of prayers) {
+    const prayerMinutes = parseTimeToMinutes(prayer.time);
+    if (prayerMinutes !== null && prayerMinutes > nowMinutes) {
+      return `${formatPrayerLabel(prayer.key)} in ${formatMinutesLeft(prayerMinutes - nowMinutes)}`;
+    }
+  }
+
+  const fajr = parseTimeToMinutes(state.settings.fajrTime);
+  if (fajr === null) return "Set prayer times";
+  return `Fajr in ${formatMinutesLeft(24 * 60 - nowMinutes + fajr)}`;
+}
+
+function parseTimeToMinutes(str) {
+  if (!str || !str.includes(":")) return null;
+  const [h, m] = str.split(":").map(Number);
+  return Number.isNaN(h) || Number.isNaN(m) ? null : h * 60 + m;
+}
+
+function formatPrayerLabel(key) {
+  return {
+    fajr: "Fajr",
+    dhuhr: "Dhuhr",
+    asr: "Asr",
+    maghrib: "Maghrib",
+    isha: "Isha"
+  }[key] || key;
+}
+
+function formatMinutesLeft(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h <= 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function calculateSleepHours(sleptAt, wokeAt) {
+  if (!sleptAt || !wokeAt) return "0.0 h";
+
+  const [sh, sm] = String(sleptAt).split(":").map(Number);
+  const [wh, wm] = String(wokeAt).split(":").map(Number);
+  if ([sh, sm, wh, wm].some(Number.isNaN)) return "0.0 h";
+
+  let s = sh * 60 + sm;
+  let w = wh * 60 + wm;
+  if (w <= s) w += 24 * 60;
+
+  return `${((w - s) / 60).toFixed(1)} h`;
+}
+
+function setInputValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value;
+}
+
+function getInputValue(id) {
+  const el = document.getElementById(id);
+  return el ? el.value : "";
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function setHtml(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = value;
+}
+
+function capitalize(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+/* =========================================================
+   RR SYSTEM PATCH
+   Strong days should score like strong days.
+   A 17/19 day with solid optional work should not lose RR just because
+   one or two "must" items were missed.
+========================================================= */
+
+function summarizeCurrentDay() {
+  const p = state.queueForms.physical;
+  const d = state.queueForms.deen;
+  const r = state.queueForms.routines;
+  const s = state.queueForms.supplements;
+
+  const supplementsTaken = Object.values(s).filter((x) => x === "yes").length;
+
+  const mustChecks = [
+    d.fajr === "yes",
+    d.dhuhr === "yes",
+    d.asr === "yes",
+    d.maghrib === "yes",
+    d.isha === "yes",
+    Number(d.quranPages) > 0,
+    !!p.sleptAt && !!p.wokeAt,
+    supplementsTaken >= 2
+  ];
+
+  const allChecks = [
+    Number(p.weightLogged) > 0,
+    p.gymWent === "yes",
+    Number(p.calories) > 0,
+    !!p.sleptAt && !!p.wokeAt,
+    Number(p.waterOz) > 0,
+    Number(p.steps) >= 10000,
+
+    d.fajr === "yes",
+    d.dhuhr === "yes",
+    d.asr === "yes",
+    d.maghrib === "yes",
+    d.isha === "yes",
+    Number(d.quranPages) > 0,
+
+    r.morningAcne === "yes",
+    r.nightAcne === "yes",
+    Number(r.screenHours) > 0,
+
+    s.iron === "yes",
+    s.zinc === "yes",
+    s.magnesium === "yes",
+    s.creatine === "yes"
+  ];
+
+  const optionalChecks = [
+    d.fajrSunnah === "yes",
+    d.dhuhrSunnah === "yes",
+    d.maghribSunnah === "yes",
+    d.ishaSunnah === "yes",
+    d.tahajjud === "yes",
+    Number(p.calories) > 0,
+    Number(p.waterOz) > 0,
+    !!p.sleptAt && !!p.wokeAt,
+    Number(d.quranPages) > 0,
+    r.morningAcne === "yes",
+    r.nightAcne === "yes",
+    Number(r.screenHours) > 0,
+    supplementsTaken === 4
+  ];
+
+  const mustDone = mustChecks.filter(Boolean).length;
+  const mustTotal = mustChecks.length;
+
+  const requiredDone = allChecks.filter(Boolean).length;
+  const requiredTotal = allChecks.length;
+
+  const optionalDone = optionalChecks.filter(Boolean).length;
+
+  const eliteDay = requiredDone >= 17 && optionalDone >= 5;
+  const strongDay = requiredDone >= 15 && mustDone >= Math.max(1, mustTotal - 1);
+  const solidDay = requiredDone >= 13 && mustDone >= Math.max(1, mustTotal - 2);
+  const weakDay = requiredDone >= 10;
+
+  let rrDelta = 0;
+  let result = "defeat";
+
+  if (eliteDay) {
+    result = "victory";
+    rrDelta = 14 + Math.min(6, optionalDone);
+  } else if (strongDay) {
+    result = "victory";
+    rrDelta = 8 + Math.min(5, optionalDone);
+  } else if (solidDay) {
+    result = "victory";
+    rrDelta = 4 + Math.min(4, optionalDone);
+  } else if (weakDay) {
+    rrDelta = -Math.min(3, Math.max(1, 12 - requiredDone));
+  } else {
+    rrDelta = -Math.min(12, Math.max(4, (mustTotal - mustDone) * 2));
+  }
+
+  return {
+    mustDone,
+    mustTotal,
+    requiredDone,
+    requiredTotal,
+    optionalDone,
+    result,
+    rrDelta,
+
+    weight: parseStoredMetric(p.weightLogged),
+    calories: parseStoredMetric(p.calories),
+    steps: parseStoredMetric(p.steps),
+    screenHours: parseStoredMetric(r.screenHours, { allowZero: true }),
+
+    gymWent: p.gymWent === "yes",
+    allSalah:
+      d.fajr === "yes" &&
+      d.dhuhr === "yes" &&
+      d.asr === "yes" &&
+      d.maghrib === "yes" &&
+      d.isha === "yes",
+    sunnahCount: optionalChecks.slice(0, 4).filter(Boolean).length,
+    tahajjud: d.tahajjud === "yes",
+    quranPages: parseStoredMetric(d.quranPages, { allowZero: true }),
+    waterOz: parseStoredMetric(p.waterOz, { allowZero: true }),
+    sleptAt: p.sleptAt,
+    wokeAt: p.wokeAt,
+    ateAfterMaghrib: p.ateAfterMaghrib === "yes",
+    morningAcne: r.morningAcne === "yes",
+    nightAcne: r.nightAcne === "yes",
+    supplementsTaken,
+    formsSnapshot: JSON.parse(JSON.stringify(state.queueForms))
+  };
+}
+
+function syncLiveHistoryFromForms() {
+  ensureActiveDayState();
+
+  const today = state.activeDate || getTodayDateString();
+  state.history = state.history.filter((x) => x.id !== "live-today" && x.date !== today);
+
+  if (!hasMeaningfulDayState()) {
+    state.history.sort((a, b) => b.date.localeCompare(a.date));
+    return;
+  }
+
+  const summary = summarizeCurrentDay();
+  const previousRR = getFinalizedCareerRR();
+  const rrRunning = Math.max(0, previousRR + summary.rrDelta);
+
+  const liveEntry = {
+    id: "live-today",
+    date: today,
+    updatedAt: new Date().toISOString(),
+    result: summary.result,
+    rrDelta: summary.rrDelta,
+    rrRunning,
+    scoreline: `${summary.weight || 0} lb`,
+    kda: `${summary.requiredDone}/${summary.requiredTotal}/${summary.optionalDone}`,
+    weight: summary.weight,
+    calories: summary.calories,
+    steps: summary.steps,
+    screenHours: summary.screenHours,
+    summary
+  };
+
+  state.history.unshift(liveEntry);
+  state.history.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+const CAREER_AGENT_IMAGE = "./assets/jett.png";
+const CAREER_RANK_IMAGE = "./assets/iron1.png";
+
+const CAREER_MAP_IMAGES = [
+  "./assets/map1.png",
+  "./assets/map2.png",
+  "./assets/map3.png",
+  "./assets/map4.png",
+  "./assets/map5.png",
+  "./assets/map6.png",
+  "./assets/map7.png"
+];
+
+function getStableMapForDate(date) {
+  let hash = 0;
+  const text = String(date || "");
+
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+
+  return CAREER_MAP_IMAGES[hash % CAREER_MAP_IMAGES.length];
+}
+
+function getHistorySteps(item) {
+  return Number(
+    item.steps ??
+    item.summary?.steps ??
+    item.day?.steps ??
+    0
+  );
+}
+
+function getFinalizedCareerHistory() {
+  return getAllKnownHistory()
+    .filter((entry) => entry.id !== "live-today")
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getFinalizedCareerRR() {
+  let rr = 0;
+
+  getFinalizedCareerHistory().forEach((entry) => {
+    rr = Math.max(0, rr + Number(entry.rrDelta || 0));
+  });
+
+  return rr;
+}
+
+function renderHistoryRow(item) {
+  const win = item.result === "victory";
+  const rr = Number(item.rrDelta || 0);
+  const rrText = `${rr > 0 ? "+" : ""}${rr}`;
+  const steps = getHistorySteps(item).toLocaleString();
+  const date = formatCareerDate(item.date);
+  const mapImage = getStableMapForDate(item.date);
+
+  return `
+    <button class="career-match-row ${win ? "win" : "loss"}" type="button" data-career-date="${item.date}">
+
+      <img src="${mapImage}" alt="" onerror="this.style.display='none'" class="career-row-map-bg" />
+
+      <div class="career-agent-box">
+        <img src="./assets/jett.png" alt="Jett" onerror="this.style.display='none'" />
+      </div>
+
+      <div class="career-rank-small">
+        <img src="${CAREER_RANK_IMAGE}" alt="Rank" onerror="this.style.display='none'" />
+        <span>${rrText}</span>
+      </div>
+
+      <div class="career-match-main">
+        <div class="career-kda">KDA &nbsp; ${item.kda || "0/0/0"}</div>
+        <div class="career-score">STEPS &nbsp; ${steps}</div>
+      </div>
+
+      <div class="career-result-block">
+        <div class="career-result">${win ? "VICTORY" : "DEFEAT"}</div>
+        <div class="career-date">${date}</div>
+      </div>
+
+    </button>
+  `;
+}
+function getCareerMapImage(dateString) {
+  const maps = [
+    "./assets/map1.png",
+    "./assets/map2.png",
+    "./assets/map3.png",
+    "./assets/map4.png",
+    "./assets/map5.png",
+    "./assets/map6.png",
+    "./assets/map7.png"
+  ];
+
+  let seed = 0;
+  for (let i = 0; i < dateString.length; i++) {
+    seed += dateString.charCodeAt(i) * (i + 7);
+  }
+
+  return maps[seed % maps.length];
+}
+
+function renderCareerTab() {
+  const shell = document.getElementById("careerShell");
+  if (!shell) return;
+
+  const history = getAllKnownHistory().sort((a, b) => b.date.localeCompare(a.date));
+  const currentRR = getFinalizedCareerRR();
+  const rankName = getRankName(currentRR);
+  const rrInTier = currentRR % 100;
+  const fillPercent = Math.max(0, Math.min(100, rrInTier));
+  const rankClass = rankName.toLowerCase().startsWith("iron") ? " is-iron" : "";
+
+  shell.innerHTML = `
+    <div class="career-rank-top${rankClass}">
+      <img class="rank-image" src="${CAREER_RANK_IMAGE}" alt="${rankName} rank icon" />
+      <h2 class="career-rank-name">${rankName}</h2>
+      <div class="career-rank-bar-wrap">
+        <div class="career-rank-bar">
+          <div class="career-rank-bar-fill" style="width:${fillPercent}%"></div>
+        </div>
+        <div class="career-rank-bar-labels">
+          <span>Rank rating</span>
+          <strong>${rrInTier}/100</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="career-match-filter">
+      <div class="career-filter-pill">All modes</div>
+    </div>
+
+    <div class="career-match-list">
+      ${history.map(renderHistoryRow).join("")}
+    </div>
+  `;
+
+  document.querySelectorAll("[data-career-date]").forEach((row) => {
+    row.addEventListener("click", () => {
+      openCareerEditModal(row.dataset.careerDate);
+    });
+  });
+}
+
+function isEditableCareerDate(dateString) {
+  return true;
+}
+
+function openCareerEditModal(dateString) {
+  const entry = getAllKnownHistory().find((x) => x.date === dateString);
+  if (!entry) return;
+
+  const editable = isEditableCareerDate(dateString);
+  const summary = entry.summary || {};
+  const snapSource = summary.formsSnapshot || state.queueForms;
+  const freshForms = freshQueueForms();
+  const snap = {
+    physical: { ...freshForms.physical, ...(snapSource.physical || {}) },
+    deen: { ...freshForms.deen, ...(snapSource.deen || {}) },
+    routines: { ...freshForms.routines, ...(snapSource.routines || {}) },
+    supplements: { ...freshForms.supplements, ...(snapSource.supplements || {}) }
+  };
+
+  const old = document.getElementById("careerEditModal");
+  if (old) old.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "careerEditModal";
+  modal.className = "career-day-modal";
+
+  modal.innerHTML = `
+    <div class="career-day-card">
+      <button class="career-day-close" type="button">×</button>
+
+      <div class="career-day-top">
+        <div>
+          <p class="career-day-label">DAY REVIEW</p>
+          <h2>${formatCareerDate(dateString)}</h2>
+        </div>
+        <div class="career-day-result ${entry.result}">
+          ${entry.result === "victory" ? "VICTORY" : "DEFEAT"}
+        </div>
+      </div>
+
+      <div class="career-day-rr">
+        <span>${entry.rrDelta > 0 ? "+" : ""}${entry.rrDelta} RR</span>
+        <small>${editable ? "Editable" : "Locked"}</small>
+      </div>
+
+      <div class="career-edit-grid">
+        <label>Weight
+          <input id="editWeight" type="number" step="0.1" value="${snap.physical?.weightLogged || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Gym
+          <select id="editGym" ${editable ? "" : "disabled"}>
+            <option value="no" ${snap.physical?.gymWent === "no" ? "selected" : ""}>No</option>
+            <option value="yes" ${snap.physical?.gymWent === "yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </label>
+
+        <label>Steps — 10,000+ needed
+          <input id="editSteps" type="number" value="${snap.physical?.steps || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Calories
+          <input id="editCalories" type="number" value="${snap.physical?.calories || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Protein
+          <input id="editProtein" type="number" value="${snap.physical?.protein || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Carbs
+          <input id="editCarbs" type="number" value="${snap.physical?.carbs || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Fat
+          <input id="editFat" type="number" value="${snap.physical?.fat || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Workout type
+          <input id="editWorkoutType" type="text" value="${snap.physical?.workoutType || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Water oz
+          <input id="editWater" type="number" value="${snap.physical?.waterOz || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Slept at
+          <input id="editSleptAt" type="time" value="${snap.physical?.sleptAt || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Woke at
+          <input id="editWokeAt" type="time" value="${snap.physical?.wokeAt || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Ate after Maghrib
+          <select id="editAteAfterMaghrib" ${editable ? "" : "disabled"}>
+            <option value="no" ${snap.physical?.ateAfterMaghrib === "no" ? "selected" : ""}>No</option>
+            <option value="yes" ${snap.physical?.ateAfterMaghrib === "yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </label>
+
+        <label>Fajr
+          <select id="editFajr" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.fajr === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.fajr === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Dhuhr
+          <select id="editDhuhr" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.dhuhr === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.dhuhr === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Asr
+          <select id="editAsr" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.asr === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.asr === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Maghrib
+          <select id="editMaghrib" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.maghrib === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.maghrib === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Isha
+          <select id="editIsha" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.isha === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.isha === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Quran pages
+          <input id="editQuran" type="number" value="${snap.deen?.quranPages || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Fajr Sunnah
+          <select id="editFajrSunnah" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.fajrSunnah === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.fajrSunnah === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Dhuhr Sunnah
+          <select id="editDhuhrSunnah" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.dhuhrSunnah === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.dhuhrSunnah === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Maghrib Sunnah
+          <select id="editMaghribSunnah" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.maghribSunnah === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.maghribSunnah === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Isha Sunnah
+          <select id="editIshaSunnah" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.ishaSunnah === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.ishaSunnah === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Tahajjud
+          <select id="editTahajjud" ${editable ? "" : "disabled"}><option value="no" ${snap.deen?.tahajjud === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.deen?.tahajjud === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Morning acne
+          <select id="editMorningAcne" ${editable ? "" : "disabled"}>
+            <option value="no" ${snap.routines?.morningAcne === "no" ? "selected" : ""}>No</option>
+            <option value="yes" ${snap.routines?.morningAcne === "yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </label>
+
+        <label>Night acne
+          <select id="editNightAcne" ${editable ? "" : "disabled"}>
+            <option value="no" ${snap.routines?.nightAcne === "no" ? "selected" : ""}>No</option>
+            <option value="yes" ${snap.routines?.nightAcne === "yes" ? "selected" : ""}>Yes</option>
+          </select>
+        </label>
+
+        <label>Screen hours
+          <input id="editScreenHours" type="number" step="0.1" value="${snap.routines?.screenHours || ""}" ${editable ? "" : "disabled"} />
+        </label>
+
+        <label>Iron
+          <select id="editIron" ${editable ? "" : "disabled"}><option value="no" ${snap.supplements?.iron === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.supplements?.iron === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Zinc
+          <select id="editZinc" ${editable ? "" : "disabled"}><option value="no" ${snap.supplements?.zinc === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.supplements?.zinc === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Magnesium
+          <select id="editMagnesium" ${editable ? "" : "disabled"}><option value="no" ${snap.supplements?.magnesium === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.supplements?.magnesium === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+
+        <label>Creatine
+          <select id="editCreatine" ${editable ? "" : "disabled"}><option value="no" ${snap.supplements?.creatine === "no" ? "selected" : ""}>No</option><option value="yes" ${snap.supplements?.creatine === "yes" ? "selected" : ""}>Yes</option></select>
+        </label>
+      </div>
+
+      <div class="career-day-status">
+        ${editable ? "Saved changes will recalculate this day and keep the updated chart." : "Locked."}
+      </div>
+
+      ${editable ? `<button id="saveCareerEdit" class="primary-action" type="button">SAVE CHANGES</button>` : ""}
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.querySelector(".career-day-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  document.getElementById("saveCareerEdit")?.addEventListener("click", () => {
+    const newForms = JSON.parse(JSON.stringify(snap));
+
+    newForms.physical.weightLogged = document.getElementById("editWeight").value;
+    newForms.physical.gymWent = document.getElementById("editGym").value;
+    newForms.physical.steps = document.getElementById("editSteps").value;
+    newForms.physical.calories = document.getElementById("editCalories").value;
+    newForms.physical.protein = document.getElementById("editProtein").value;
+    newForms.physical.carbs = document.getElementById("editCarbs").value;
+    newForms.physical.fat = document.getElementById("editFat").value;
+    newForms.physical.workoutType = document.getElementById("editWorkoutType").value;
+    newForms.physical.waterOz = document.getElementById("editWater").value;
+    newForms.physical.sleptAt = document.getElementById("editSleptAt").value;
+    newForms.physical.wokeAt = document.getElementById("editWokeAt").value;
+    newForms.physical.ateAfterMaghrib = document.getElementById("editAteAfterMaghrib").value;
+
+    newForms.deen.fajr = document.getElementById("editFajr").value;
+    newForms.deen.dhuhr = document.getElementById("editDhuhr").value;
+    newForms.deen.asr = document.getElementById("editAsr").value;
+    newForms.deen.maghrib = document.getElementById("editMaghrib").value;
+    newForms.deen.isha = document.getElementById("editIsha").value;
+    newForms.deen.quranPages = document.getElementById("editQuran").value;
+    newForms.deen.fajrSunnah = document.getElementById("editFajrSunnah").value;
+    newForms.deen.dhuhrSunnah = document.getElementById("editDhuhrSunnah").value;
+    newForms.deen.maghribSunnah = document.getElementById("editMaghribSunnah").value;
+    newForms.deen.ishaSunnah = document.getElementById("editIshaSunnah").value;
+    newForms.deen.tahajjud = document.getElementById("editTahajjud").value;
+
+    newForms.routines.morningAcne = document.getElementById("editMorningAcne").value;
+    newForms.routines.nightAcne = document.getElementById("editNightAcne").value;
+    newForms.routines.screenHours = document.getElementById("editScreenHours").value;
+
+    newForms.supplements.iron = document.getElementById("editIron").value;
+    newForms.supplements.zinc = document.getElementById("editZinc").value;
+    newForms.supplements.magnesium = document.getElementById("editMagnesium").value;
+    newForms.supplements.creatine = document.getElementById("editCreatine").value;
+
+    const oldForms = state.queueForms;
+    state.queueForms = newForms;
+    const newSummary = summarizeCurrentDay();
+    state.queueForms = oldForms;
+
+    entry.summary = newSummary;
+    entry.updatedAt = new Date().toISOString();
+    entry.result = newSummary.result;
+    entry.rrDelta = newSummary.rrDelta;
+    entry.kda = `${newSummary.requiredDone}/${newSummary.requiredTotal}/${newSummary.optionalDone}`;
+    entry.weight = newSummary.weight;
+    entry.steps = newSummary.steps;
+    entry.calories = newSummary.calories;
+    entry.scoreline = `${newSummary.weight || 0} lb`;
+
+    recomputeCareerRR();
+    saveState();
+    modal.remove();
+    renderCareerTab();
+    renderProgressCharts();
+  });
+}
+
+function recomputeCareerRR() {
+  const sorted = getAllKnownHistory().sort((a, b) => a.date.localeCompare(b.date));
+  let rr = 0;
+
+  sorted.forEach((entry) => {
+    rr = Math.max(0, rr + Number(entry.rrDelta || 0));
+    entry.rrRunning = rr;
+  });
+
+  state.history = sorted.sort((a, b) => b.date.localeCompare(a.date));
+}
