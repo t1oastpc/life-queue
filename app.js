@@ -2750,17 +2750,17 @@ function syncLiveHistoryFromForms() {
   state.history.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-const CAREER_AGENT_IMAGE = "./assets/jett.png";
-const CAREER_RANK_IMAGE = "./assets/iron1.png";
+const CAREER_AGENT_IMAGE = "./jett.png";
+const CAREER_RANK_IMAGE = "./iron1.png";
 
 const CAREER_MAP_IMAGES = [
-  "./assets/map1.png",
-  "./assets/map2.png",
-  "./assets/map3.png",
-  "./assets/map4.png",
-  "./assets/map5.png",
-  "./assets/map6.png",
-  "./assets/map7.png"
+  "./map1.png",
+  "./map2.png",
+  "./map3.png",
+  "./map4.png",
+  "./map5.png",
+  "./map6.png",
+  "./map7.png"
 ];
 
 function getStableMapForDate(date) {
