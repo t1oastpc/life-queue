@@ -2813,7 +2813,7 @@ function renderHistoryRow(item) {
       <img src="${mapImage}" alt="" onerror="this.style.display='none'" class="career-row-map-bg" />
 
       <div class="career-agent-box">
-        <img src="./assets/jett.png" alt="Jett" onerror="this.style.display='none'" />
+        <img src="./jett.png" alt="Jett" onerror="this.style.display='none'" />
       </div>
 
       <div class="career-rank-small">
@@ -2836,13 +2836,13 @@ function renderHistoryRow(item) {
 }
 function getCareerMapImage(dateString) {
   const maps = [
-    "./assets/map1.png",
-    "./assets/map2.png",
-    "./assets/map3.png",
-    "./assets/map4.png",
-    "./assets/map5.png",
-    "./assets/map6.png",
-    "./assets/map7.png"
+   "./map1.png",
+  "./map2.png",
+  "./map3.png",
+  "./map4.png",
+  "./map5.png",
+  "./map6.png",
+  "./map7.png"
   ];
 
   let seed = 0;
